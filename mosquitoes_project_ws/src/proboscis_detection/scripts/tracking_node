@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import roslib
+#roslib.load_manifest('my_package')
+import sys
+import rospy
+import cv2
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+from rospy.numpy_msg import numpy_msg
+#from proboscis_detection.msgs import proboscis_info
+
+import numpy as np
+from matplotlib import pyplot as plt
+import time as t
+from settings import *
+from detection_code import *
+from tracking_code import *
+#from proboscis_monitor_once import *
+from proboscis_detection.msg import robot_info
+from proboscis_detection.msg import robot_state_info
+
+class image_converter:
+
+    def __init__(self):
+#    self.image_pub = rospy.Publisher("image_topic_2",Image)
+
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/cv_camera/image_raw",Image,self.callback)
+        try:
+            old_frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
+        except CvBridgeError as e:
+            print(e)
+
+        old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+        p0, lk_params, color = get_tracking_features(old_gray, bb_list, index)
+    def callback(self,data):
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+        except CvBridgeError as e:
+            print(e)
+
+        if p0 is not None:
+            p0, old_gray, cimg = tracking(p0, old_gray, frame_gray, lk_params, color, cimg)
+            info = robot_info()
+            pub.publish(info)
+
+        #cv2.imshow("Image window", cv_image)
+        cv2.waitKey(3)
+
+#    try:
+#      self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
+#    except CvBridgeError as e:
+#      print(e)
+
+def main(args):
+    ic = image_converter()
+    rospy.init_node('tracking_node', anonymous=True)
+    rate = rospy.Rate(10) # 10hz
+  try:
+      rospy.spin()
+  except KeyboardInterrupt:
+      print("Shutting down")
+  cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main(sys.argv)
+
+
+
+def tracking_node():
+    pub = rospy.Publisher('prob_info', numpy_msg(robot_info), queue_size=10)
+    rospy.init_node('detection_node', anonymous=True)
+
+
+    while not rospy.is_shutdown():
+
+            cimg = frame.copy()
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if p0 is not None:
+                p0, old_gray, cimg = tracking(p0, old_gray, frame_gray, lk_params, color, cimg)
+
+                    info = robot_info()
+
+                    pub.publish(info)
+
+	        if cv2.waitKey(1) & 0xFF == 27:
+		    break
+	    else:
+	        break
+            rate.sleep()
+        # Release everything if job is finished
+        cap.release()
+        #out.release()
+        cv2.destroyAllWindows()
+

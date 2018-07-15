@@ -1,0 +1,8 @@
+prefix=/home/administer/mosquitoes_project_ws/install
+
+Name: calibration
+Description: Description of calibration
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/administer/mosquitoes_project_ws/install/lib 
+Requires: 

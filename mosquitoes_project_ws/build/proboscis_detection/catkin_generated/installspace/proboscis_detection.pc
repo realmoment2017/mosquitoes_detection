@@ -1,0 +1,8 @@
+prefix=/home/administer/mosquitoes_project_ws/install
+
+Name: proboscis_detection
+Description: Description of proboscis_detection
+Version: 0.0.0
+Cflags: -I/home/administer/mosquitoes_project_ws/install/include
+Libs: -L/home/administer/mosquitoes_project_ws/install/lib 
+Requires: message_runtime

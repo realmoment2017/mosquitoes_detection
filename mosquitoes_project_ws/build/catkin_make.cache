@@ -1,0 +1,2 @@
+calibration:cv_camera:galil:proboscis_detection
+-DCATKIN_DEVEL_PREFIX=/home/administer/mosquitoes_project_ws/devel -DCMAKE_INSTALL_PREFIX=/home/administer/mosquitoes_project_ws/install -G Unix Makefiles
