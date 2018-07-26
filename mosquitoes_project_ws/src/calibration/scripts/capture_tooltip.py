@@ -53,7 +53,7 @@ def capture_tooltip(img):
 
     # define range of blue color in HSV
     lower_blue = np.array([80,40,80])
-    upper_blue = np.array([130,80,165])
+    upper_blue = np.array([130,80,140])
 
     # Threshold the HSV image to get only blue colors
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -64,7 +64,7 @@ def capture_tooltip(img):
 #         print(hsv[200,100])
 
 
-    kernel = np.ones((15,15),np.uint8)
+    kernel = np.ones((25,25),np.uint8)
     blue = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     diff = blue.copy()
     im2, contours, hierarchy = cv2.findContours(blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -118,7 +118,7 @@ def capture_tooltip(img):
         index = np.argmax(approx[:,0,1])
 #             print(approx.shape, index)
 #             print(approx[:,0,0])
-        tool_tip = (approx[index,0,1], approx[index,0,0])
+        tool_tip = (approx[index,0,0], approx[index,0,1]) # changed here
         if tool_tip is not None:
             print('x:{}    y:{}'.format(tool_tip[0], tool_tip[1]))
             cv2.circle(cimg,(tool_tip[1],tool_tip[0]), 5, (0,0,255), -1) 

@@ -32,7 +32,7 @@ def proboscis_monitor_once(frame):
         remove_body_thresh = cv2.getTrackbarPos('remove_body_thresh', 'cimg')
 
     else:
-        remove_body_thresh = 120
+        remove_body_thresh = 100
 
     img = frame[IMG_upper_left_x:IMG_upper_left_x + HEIGHT,IMG_upper_left_y:IMG_upper_left_y + WIDTH,:]
 
@@ -42,78 +42,26 @@ def proboscis_monitor_once(frame):
 
 
     gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray,120,255,cv2.THRESH_BINARY_INV)
+    ret, thresh = cv2.threshold(gray,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
+    thresh_s = cv2.resize(thresh,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('thresh_s', thresh_s)
 
-#     # noise removal
-#     kernel = np.ones((3,3),np.uint8)
-#     opening = cv2.morphologyEx(thresh,cv2.MORPH_OPEN,kernel, iterations = 2)
-
-
-#     # sure background area
-#     sure_bg = cv2.dilate(opening,kernel,iterations=5)
-
-
-#     # Finding sure foreground area
-#     dist_transform = cv2.distanceTransform(opening,cv2.DIST_L2,5)
-#     ret, sure_fg = cv2.threshold(dist_transform,0.01*dist_transform.max(),255,0)
-
-
-#     # Finding unknown region
-#     sure_fg = np.uint8(sure_fg)
-#     unknown = cv2.subtract(sure_bg,sure_fg)
-
-
-#     # Marker labelling
-#     ret, markers = cv2.connectedComponents(sure_fg)
-
-#     # Add one to all labels so that sure background is not 0, but 1
-#     # Markers: unknown--0, background--1, others--start from 2
-#     markers = markers+1
-
-#     # Now, mark the region of unknown with zero
-#     markers[unknown==255] = 0
-
-#     # Markers: Boundaries are marked as -1, background -- 1, others--start from 2
-#     markers = cv2.watershed(src_img_copy,markers)
-
-#     # Bounding box test
-#     markers_copy = markers.copy()
-#     markers_copy[markers_copy==-1] = 1
-#     markers_copy = np.array(markers_copy, dtype = np.uint8)
-
-#     num_iters = markers_copy.max() + 1
-
-#     bb_list = []
-#     for index in range(2, num_iters):
-#         thresh_img = np.zeros((HEIGHT, WIDTH), dtype = np.uint8)
-#         thresh_img[markers_copy==index] = 255
-#         im2, contours, hierarchy = cv2.findContours(thresh_img,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-#         # Draw bounding boxes
-#         idx =0 
-#         for cnt in contours:
-#             idx += 1
-#             x,y,w,h = cv2.boundingRect(cnt)
-#             # Check for qualified region proposals
-#             area = cv2.contourArea(cnt)
-#             if area > 2000 and area<8000:
-#                 bb = cv2.boundingRect(cnt)
-#                 bb_list.append(bb)
-#                 cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,255,0),2)
-
+    # detection bounding boxes
     bb_list, cimg = bbox_detection(src_img_copy, thresh, cimg)
 
     if len(bb_list)==0:
         print('bb_list is None, please check the bounding box detection')
         return None, None, None, None
 
+    # fit body lines
+    line_img = img.copy()
+    cimg, body_info = fit_lines(src_img_copy, cimg, bb_list, remove_body_thresh)
+
     # find_head
     head_img = img.copy()
     if len(head_img.shape)==3:
         head_img = cv2.cvtColor(head_img,cv2.COLOR_BGR2GRAY)
     head_list = find_head_v1(head_img, cimg, bb_list, 50, 5, remove_body_thresh)
-#         if len(head_list)!=len(bb_list):
-#             print('bb_list length is {}, while head_list is {}'.format(len(bb_list),len(head_list)))
-#             continue
 
     # find proboscis
     proboscis_img = img.copy()

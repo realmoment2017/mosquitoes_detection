@@ -64,7 +64,7 @@ def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
     #cv2.imshow('body_thresh_img', img_s)
 
-    ret, thresh = cv2.threshold(img,55,255,cv2.THRESH_BINARY)
+    ret, thresh = cv2.threshold(img,50,255,cv2.THRESH_BINARY)
     img[thresh>0] = 255
     img = cv2.medianBlur(img,5)
     
@@ -180,11 +180,18 @@ def find_proboscis(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size
                                 max_dist = dist_p2
                                 end_point = p2
         if max_dist>0:
-            theta = np.arctan2(end_point[0] - head_w, end_point[1] - head_h)
-            cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.sin(theta)), int(head_h + 40*np.cos(theta))),(0,255,255),3)
-            proboscis_coords = (int(head_w + 20*np.sin(theta)), int(head_h + 20*np.cos(theta)))
+            #theta = np.arctan2(end_point[0] - head_w, end_point[1] - head_h)
+            #cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.sin(theta)), int(head_h + 40*np.cos(theta))),(0,255,255),3)
+            #proboscis_coords = (int(head_w + 20*np.sin(theta)), int(head_h + 20*np.cos(theta)))
+            #proboscis_coords_list.append(proboscis_coords)
+            #theta = theta-(np.pi/2)
+
+            theta = np.arctan2(-(end_point[1] - head_h), end_point[0] - head_w)
+
+            cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.cos(theta)), int(head_h - 40*np.sin(theta))),(0,255,255),3)
+            proboscis_coords = (int(head_w + 20*np.cos(theta)), int(head_h - 20*np.sin(theta)))
             proboscis_coords_list.append(proboscis_coords)
-            theta = theta-(np.pi/2)
+
             proboscis_orient_list.append(theta)
             cv2.circle(cimg,(proboscis_coords[0], proboscis_coords[1]),3,(0,0,255),2)
             bb_list_refine.append([x,y,w,h])
@@ -245,8 +252,57 @@ def bbox_detection(src_img_copy, thresh, cimg):
             # Check for qualified region proposals
             area = cv2.contourArea(cnt)
             aspect_ratio = max(float(w)/h, float(h)/w)
-            if area > 2000 and area<8000 and aspect_ratio<2.5:
+            if area > 2000 and area<8000 and aspect_ratio<3:
                 bb = cv2.boundingRect(cnt)
                 bb_list.append(bb)
                 cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,255,0),2)
     return bb_list, cimg
+
+
+def fit_lines(src_img_copy, cimg, bb_list, thresh=80):
+    gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
+    _, line_img = cv2.threshold(gray,thresh,255,cv2.THRESH_BINARY_INV)
+    kernel = np.ones((3,3),np.uint8)    
+    opening = cv2.morphologyEx(line_img,cv2.MORPH_OPEN,kernel, iterations = 2)
+    line_dist_transform = cv2.distanceTransform(opening,cv2.DIST_L2,5)
+    ret, line_sure_fg = cv2.threshold(line_dist_transform,0.2*line_dist_transform.max(),255,0)
+    
+#     cv2.imshow("line_sure_fg",line_sure_fg)
+#     cv2.waitKey(-1)
+    
+    body_info = []
+    for (x,y,w,h) in bb_list:
+        roi = line_sure_fg[y:y+h, x:x+w]
+        roi = roi.astype(np.uint8)
+        rows,cols = roi.shape[:2]
+#         roi_draw = roi.copy()
+#         roi_draw = cv2.cvtColor(roi_draw,cv2.COLOR_GRAY2BGR)
+
+        im2, contours, hierarchy = cv2.findContours(roi,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        max_area = 0
+        index = 0
+        max_index = None
+        theta = 0
+        for index, cnt in enumerate(contours):
+            area = cv2.contourArea(cnt)
+            if area>max_area:
+                max_area = area
+                max_index = index
+        if max_index is not None:
+            cnt = contours[max_index]
+    #         roi_draw = cv2.drawContours(roi_draw, [cnt], 0, (0,255,0), 5)
+    #         cv2.imshow('line_img_roi', roi_draw)
+    #         cv2.waitKey(-1)
+    
+            [vx,vy,x_l,y_l] = cv2.fitLine(cnt, cv2.DIST_L2,0,0.01,0.01)
+            theta = -(np.arctan2(vy, vx))[0]
+            center_x = x+int(x_l)
+            center_y = y+int(y_l)
+            cv2.circle(cimg,(center_x,center_y),2,(0,255,255),10)
+            center = (center_x, center_y)
+            cv2.line(cimg,(int(center_x - 50*np.cos(theta)),int(center_y + 50*np.sin(theta))),
+                          (int(center_x + 50*np.cos(theta)),int(center_y - 50*np.sin(theta))),(0,255,0),2)
+            body_info.append([center, theta])
+        else: 
+            body_info.append([(None, None), None])
+    return cimg, body_info

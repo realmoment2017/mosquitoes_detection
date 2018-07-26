@@ -34,7 +34,7 @@ class image_converter:
         proboscis_coords_trans = list()
         bb_list_trans = list()
         proboscis_coords, proboscis_orients, bb_list, cimg = proboscis_monitor_once(cv_image)
-        assert len(proboscis_coords)==len(bb_list)
+        #assert len(proboscis_coords)==len(bb_list)
         if proboscis_coords is not None:
             for index in range(len(proboscis_coords)):
                 proboscis_coords_trans.append(proboscis_coords[index][0])

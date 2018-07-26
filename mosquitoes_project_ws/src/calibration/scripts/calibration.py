@@ -63,36 +63,36 @@ def main():
 
 
     # initialize
-    robo_pos = [[0]*2]*300
-    camera_pos = [[0]*2]*300
+    robo_pos = [[0]*2]*2
+    camera_pos = [[0]*2]*2
     a_count = 0
 
     #loop though the workspace
-    for i in range(1,21):
-        for j in range(1,16):
+    for i in range(1,2):
+        for j in range(1,3):
             print(i,j)
-            g.GCommand('PR ,0,-2200')
+            g.GCommand('PR ,0,-2750')
             g.GCommand('BG C')
-            sleep(1)
+            sleep(2)
             cam_pos = get_tooltip()
             print(cam_pos)
-            #while len(cam_pos)<2:
+            #if len(cam_pos)<2:
             #   cam_pos = get_tooltip()    
             #   print(cam_pos)
             robo = g.GCommand('TP ,B,C,D')
             robo = strtoform(robo)
-            
+            print(robo)
             camera_pos[a_count] = cam_pos
             robo_pos[a_count] = robo
             a_count = a_count+1
             
-        g.GCommand('PR ,,33000')
+        g.GCommand('PR ,,49500')
         g.GCommand('BG C')
         sleep(2)
-        g.GCommand('PR ,2300')
+        g.GCommand('PR ,3250')
         g.GCommand('BG B')
         sleep(2)
-    g.GCommand('PR ,-46000')
+    g.GCommand('PR ,-65000')
     g.GCommand('BG B')
     sleep(3)
     
@@ -109,6 +109,18 @@ def main():
     g.GClose() #don't forget to close connections!
   
  
+  f= open("camera.txt","w+")
+  fl= open("robo.txt","w+")
+  nR = len(camera_pos)
+  print(nR)
+  print(camera_pos[1])
+
+  for i in camera_pos:
+     f.write(str(i) + "\n")
+
+  for i in robo_pos:
+     f.write(str(i) + "\n")
+  
 
   return(camera_pos,robo_pos)
     
@@ -127,5 +139,6 @@ def main():
  
 #runs main() if example.py called from the console
 if __name__ == '__main__':
-   main()
+   camera , robo = main()
+   
 
