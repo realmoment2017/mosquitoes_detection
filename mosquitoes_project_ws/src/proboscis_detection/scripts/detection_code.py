@@ -36,13 +36,13 @@ def remove_body_proboscis(img, remove_body_thresh):
     body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=3)
     body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=5)
     diff = abs(body_thresh_copy - body_thresh_img)
-#     img_s = diff.copy()
-#     img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
-#     cv2.imshow('img_s', img_s)
     kernel = np.ones((3,3),np.uint8)
-    diff = cv2.erode(diff,kernel,iterations=1)
-#     diff = cv2.dilate(diff,kernel,iterations=2)
 
+    diff = cv2.erode(diff,kernel,iterations=2)
+#     diff = cv2.dilate(diff,kernel,iterations=2)
+    prob_img_s = diff.copy()
+    prob_img_s = cv2.resize(prob_img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('prob_img_s', prob_img_s)
     return img, diff
 
 def get_img_value(img, x, y):
@@ -64,7 +64,7 @@ def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
     #cv2.imshow('body_thresh_img', img_s)
 
-    ret, thresh = cv2.threshold(img,50,255,cv2.THRESH_BINARY)
+    ret, thresh = cv2.threshold(img,45,255,cv2.THRESH_BINARY)
     img[thresh>0] = 255
     img = cv2.medianBlur(img,5)
     
@@ -199,7 +199,16 @@ def find_proboscis(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size
     #print(proboscis_coords_list, proboscis_orient_list)
     return cimg, proboscis_coords_list, proboscis_orient_list, bb_list_refine
 
-def bbox_detection(src_img_copy, thresh, cimg):
+def bbox_detection(src_img_copy, cimg, remove_body_thresh=100):
+
+    gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
+    ret, thresh = cv2.threshold(gray,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
+
+    thresh = remove_tool(src_img_copy, thresh)
+
+    thresh_s = cv2.resize(thresh,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('thresh_s', thresh_s)
+
     # noise removal
     kernel = np.ones((3,3),np.uint8)
     opening = cv2.morphologyEx(thresh,cv2.MORPH_OPEN,kernel, iterations = 2)
@@ -252,7 +261,7 @@ def bbox_detection(src_img_copy, thresh, cimg):
             # Check for qualified region proposals
             area = cv2.contourArea(cnt)
             aspect_ratio = max(float(w)/h, float(h)/w)
-            if area > 2000 and area<8000 and aspect_ratio<3:
+            if area > 2000 and area<8000 and aspect_ratio<4:
                 bb = cv2.boundingRect(cnt)
                 bb_list.append(bb)
                 cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,255,0),2)
@@ -306,3 +315,28 @@ def fit_lines(src_img_copy, cimg, bb_list, thresh=80):
         else: 
             body_info.append([(None, None), None])
     return cimg, body_info
+
+
+def remove_tool(img, binary):
+    # Convert BGR to HSV
+    hsv_img = img.copy()
+    hsv = cv2.cvtColor(hsv_img, cv2.COLOR_BGR2HSV)
+
+    # define range of blue color in HSV
+    lower_blue = np.array([80,40,80])
+    upper_blue = np.array([130,80,140])
+
+    # Threshold the HSV image to get only blue colors
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # Bitwise-AND mask and original image
+#         res = cv2.bitwise_and(frame,frame, mask= mask)
+#         cv2.circle(frame, (100,200),5,(130,50,50), 3)
+#         print(hsv[200,100])
+
+
+    kernel = np.ones((35,35),np.uint8)
+    tool_area = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    binary[tool_area>0] = 0
+    return binary

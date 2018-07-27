@@ -7,22 +7,6 @@ import time as t
 from settings import *
 from detection_code import *
 
-# def sys_init():
-#     IMG_upper_left_x = 0 
-#     IMG_upper_left_y = 0
-#     WIDTH = 1600
-#     HEIGHT = 1200
-
-#     tune_mode = False
-
-#     cap = cv2.VideoCapture(0)
-#     cap.set(3,1600)
-#     cap.set(4,1200)
-#     cap.set(cv2.CAP_PROP_BRIGHTNESS, 40)
-#     cap.set(cv2.CAP_PROP_CONTRAST, 100)
-    
-#     return IMG_upper_left_x, IMG_upper_left_y, WIDTH, HEIGHT, tune_mode, cap
-
 
 def proboscis_monitor_once(frame):
     
@@ -32,22 +16,16 @@ def proboscis_monitor_once(frame):
         remove_body_thresh = cv2.getTrackbarPos('remove_body_thresh', 'cimg')
 
     else:
-        remove_body_thresh = 100
+        remove_body_thresh = 70
 
     img = frame[IMG_upper_left_x:IMG_upper_left_x + HEIGHT,IMG_upper_left_y:IMG_upper_left_y + WIDTH,:]
 
     cimg = img.copy()  
-    src_img_copy = img.copy()
-#         cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
-
-    gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
-    thresh_s = cv2.resize(thresh,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
-    cv2.imshow('thresh_s', thresh_s)
 
     # detection bounding boxes
-    bb_list, cimg = bbox_detection(src_img_copy, thresh, cimg)
+    src_img_copy = img.copy()
+    bb_list, cimg = bbox_detection(src_img_copy, cimg, remove_body_thresh)
 
     if len(bb_list)==0:
         print('bb_list is None, please check the bounding box detection')
@@ -55,7 +33,7 @@ def proboscis_monitor_once(frame):
 
     # fit body lines
     line_img = img.copy()
-    cimg, body_info = fit_lines(src_img_copy, cimg, bb_list, remove_body_thresh)
+    cimg, body_info = fit_lines(line_img, cimg, bb_list, remove_body_thresh)
 
     # find_head
     head_img = img.copy()
