@@ -27,7 +27,7 @@ def get_tracking_features(old_gray, bb_list, index=0):
 
     return p0, lk_params, color
 
-def tracking(p0, old_gray, frame_gray, lk_params, color, cimg):
+def tracking(p0, old_gray, frame_gray, lk_params, color, cimg, cv_image):
     # calculate optical flow
     p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
 
@@ -50,6 +50,13 @@ def tracking(p0, old_gray, frame_gray, lk_params, color, cimg):
         if not math.isnan(features_mean[0]):
             cv2.rectangle(cimg,(int(features_mean[0]-100),int(features_mean[1]-100)), \
                                (int(features_mean[0]+100),int(features_mean[1]+100)),(64,117,0),5)
+
+        # get the head position 
+        head_img = cv_image.copy()
+        if len(head_img.shape)==3:
+            head_img = cv2.cvtColor(head_img,cv2.COLOR_BGR2GRAY)
+        head_list = find_head_v1(head_img, cimg, bb_list, 50, 5, remove_body_thresh)
+
         cimg = cv2.add(cimg,mask)
         cv2.imshow('frame',cimg)
 

@@ -43,7 +43,7 @@ class image_converter:
             print(e)
 
         if p0 is not None:
-            p0, old_gray, cimg = tracking(p0, old_gray, frame_gray, lk_params, color, cimg)
+            p0, old_gray, cimg = tracking(p0, old_gray, frame_gray, lk_params, color, cimg, cv_image)
             info = robot_info()
             pub.publish(info)
 

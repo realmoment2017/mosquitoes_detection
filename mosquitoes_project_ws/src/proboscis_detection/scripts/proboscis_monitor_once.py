@@ -16,7 +16,7 @@ def proboscis_monitor_once(frame):
         remove_body_thresh = cv2.getTrackbarPos('remove_body_thresh', 'cimg')
 
     else:
-        remove_body_thresh = 70
+        remove_body_thresh = 100
 
     img = frame[IMG_upper_left_x:IMG_upper_left_x + HEIGHT,IMG_upper_left_y:IMG_upper_left_y + WIDTH,:]
 

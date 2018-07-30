@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from sklearn.cluster import DBSCAN
 from settings import *
 
 def nothing(x):
@@ -18,14 +19,14 @@ def remove_body_head(img, remove_body_thresh):
     kernel = np.ones((7,7),np.uint8)
     body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=3)
     
-    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=3)
+    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=4)
 
     diff = abs(body_thresh_copy - body_thresh_img)
-
+    diff_for_dbscan = diff.copy()
     kernel = np.ones((7,7),np.uint8)
     diff = cv2.erode(diff,kernel,iterations=1)
     diff = cv2.dilate(diff,kernel,iterations=1)
-    return img, diff
+    return img, diff, diff_for_dbscan
 
 def remove_body_proboscis(img, remove_body_thresh):
     #remove_body    
@@ -38,7 +39,7 @@ def remove_body_proboscis(img, remove_body_thresh):
     diff = abs(body_thresh_copy - body_thresh_img)
     kernel = np.ones((3,3),np.uint8)
 
-    diff = cv2.erode(diff,kernel,iterations=2)
+    diff = cv2.erode(diff,kernel,iterations=1)
 #     diff = cv2.dilate(diff,kernel,iterations=2)
     prob_img_s = diff.copy()
     prob_img_s = cv2.resize(prob_img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
@@ -53,6 +54,58 @@ def get_img_value(img, x, y):
     
 
 def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
+    #using hough circle detection
+    
+    #remove_body    
+    img, diff, diff_for_dbscan = remove_body_head(img, remove_body_thresh)
+
+    #img_s = diff_for_dbscan.copy()
+    #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    #cv2.imshow('head_thresh_img', img_s)
+
+    diff = 255-diff
+    img[diff==255] = 255
+
+
+    ret, thresh = cv2.threshold(img,70,255,cv2.THRESH_BINARY)
+    img[thresh>0] = 255
+    img = cv2.medianBlur(img,5)
+    
+    img_s = img.copy()
+    img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('head_thresh_img', img_s)
+    
+    head_list = list()
+    for (x,y,w,h) in bb_list:
+        roi = img[y:y+h, x:x+w]
+        roi_for_dbscan = diff_for_dbscan[y:y+h, x:x+w]
+        labels, tail_index = find_tail(roi_for_dbscan)
+
+#         cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,0,255),2)
+        circles = cv2.HoughCircles(roi,cv2.HOUGH_GRADIENT,2,minDist = min_dist,
+                                    param1=20,param2=acc_thresh,minRadius=5,maxRadius=13)
+        
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            aver_min = 9999
+            for i in circles[0,:]:
+                # draw the outer circle
+                aver = get_img_value(img, x + i[0], y + i[1])
+                if aver<aver_min:
+                    aver_min = aver
+                    c_x = x + i[0]
+                    c_y = y + i[1]
+            if (c_y-y,c_x-x) in labels.keys():
+                if labels[(c_y-y,c_x-x)]!=tail_index:
+                #if True:
+                    cv2.circle(cimg,(c_x,c_y),10,(0,255,0),2)
+                    head_list.append((c_y, c_x))
+                    # draw the center of the circle
+        #             cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
+    
+    return head_list
+
+def find_head_v2(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
     #using hough circle detection
     
     #remove_body    
@@ -101,7 +154,7 @@ def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     
     return head_list
 
-def find_head_v2(img, cimg, bb_list, min_dist, acc_thresh, remove_body_thresh=80):
+def find_head_v3(img, cimg, bb_list, min_dist, acc_thresh, remove_body_thresh=80):
     #remove_body    
     img, diff = remove_body(img, remove_body_thresh)
     diff = 255-diff
@@ -340,3 +393,43 @@ def remove_tool(img, binary):
 
     binary[tool_area>0] = 0
     return binary
+
+
+def find_tail(roi):
+    
+#     t_start = t.time()
+    image_diff = roi.copy()
+    init_shape = image_diff.shape
+    pos_x, pos_y = np.where(image_diff>0)
+    pos_x = np.reshape(pos_x, (len(pos_x),1))
+    pos_y = np.reshape(pos_y, (len(pos_y),1))
+    positions = np.hstack((pos_x,pos_y))
+
+    db = DBSCAN(eps=2.5, min_samples=20).fit(positions)
+
+    labels = db.labels_
+
+    count = np.bincount(np.array(labels)+1)
+    tail_index = np.argmax(count)-1
+
+
+    label_dict = {tuple(point): label for point, label in zip(positions, labels)}
+#     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+#     print(n_clusters_)
+
+    #new_image = np.zeros_like(image_diff, dtype=np.int8)
+    #for index, point in enumerate(positions):
+    #    new_image[point[0], point[1]] = labels[index]
+#     mask0 = labels>1
+
+#     print(t.time() - t_start)
+
+#     plt.imshow(new_image)
+#     plt.show()  
+    
+
+    #print(np.unique(labels))
+    #print(count)
+    #print(tail_index)
+    
+    return label_dict, tail_index
