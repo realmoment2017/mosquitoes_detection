@@ -16,10 +16,11 @@ def remove_body_head(img, remove_body_thresh):
     body_img = img.copy()
     ret, body_thresh_img = cv2.threshold(body_img,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
     body_thresh_copy = body_thresh_img.copy()
-    kernel = np.ones((7,7),np.uint8)
-    body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=3)
+    kernel = np.ones((3,3),np.uint8)
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3, 3))
+    body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=15)
     
-    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=4)
+    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=13)
 
     diff = abs(body_thresh_copy - body_thresh_img)
     diff_for_dbscan = diff.copy()
@@ -35,7 +36,7 @@ def remove_body_proboscis(img, remove_body_thresh):
     body_thresh_copy = body_thresh_img.copy()
     kernel = np.ones((7,7),np.uint8)
     body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=3)
-    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=5)
+    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=6)
     diff = abs(body_thresh_copy - body_thresh_img)
     kernel = np.ones((3,3),np.uint8)
 
@@ -59,21 +60,21 @@ def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     #remove_body    
     img, diff, diff_for_dbscan = remove_body_head(img, remove_body_thresh)
 
-    #img_s = diff_for_dbscan.copy()
-    #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
-    #cv2.imshow('head_thresh_img', img_s)
+    img_s = diff_for_dbscan.copy()
+    img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('head_thresh_img', img_s)
 
     diff = 255-diff
     img[diff==255] = 255
 
 
-    ret, thresh = cv2.threshold(img,70,255,cv2.THRESH_BINARY)
+    ret, thresh = cv2.threshold(img,55,255,cv2.THRESH_BINARY)
     img[thresh>0] = 255
     img = cv2.medianBlur(img,5)
     
-    img_s = img.copy()
-    img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
-    cv2.imshow('head_thresh_img', img_s)
+    #img_s = img.copy()
+    #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    #cv2.imshow('head_thresh_img', img_s)
     
     head_list = list()
     for (x,y,w,h) in bb_list:
@@ -201,7 +202,7 @@ def find_proboscis(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size
         cv2.rectangle(cimg,(x,y),(x+bb_size*2,y+bb_size*2),(255,0,255),2)
         
         roi = diff[y:y+bb_size*2, x:x+bb_size*2]
-
+        roi = cv2.medianBlur(roi,5)
         
         minLineLength = 17
         maxLineGap = 17
@@ -380,8 +381,12 @@ def remove_tool(img, binary):
     upper_blue = np.array([130,80,140])
 
     # Threshold the HSV image to get only blue colors
-    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+    mask1 = cv2.inRange(hsv, lower_blue, upper_blue)
 
+    lower_red = np.array([0,100,50])
+    upper_red = np.array([10,255,255])
+    mask2 = cv2.inRange(hsv, lower_red, upper_red)
+    mask = cv2.add(mask1,mask2)
     # Bitwise-AND mask and original image
 #         res = cv2.bitwise_and(frame,frame, mask= mask)
 #         cv2.circle(frame, (100,200),5,(130,50,50), 3)
@@ -428,8 +433,8 @@ def find_tail(roi):
 #     plt.show()  
     
 
-    #print(np.unique(labels))
-    #print(count)
+    print(np.unique(labels))
+    print(count)
     #print(tail_index)
     
     return label_dict, tail_index
