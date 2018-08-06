@@ -39,7 +39,7 @@ def proboscis_monitor_once(frame):
     head_img = img.copy()
     if len(head_img.shape)==3:
         head_img = cv2.cvtColor(head_img,cv2.COLOR_BGR2GRAY)
-    head_list = find_head_v1(head_img, cimg, bb_list, 50, 5, remove_body_thresh)
+    head_list = find_head_v3(head_img, cimg, bb_list, 50, 5, remove_body_thresh)
 
     # find proboscis
     proboscis_img = img.copy()
@@ -47,7 +47,7 @@ def proboscis_monitor_once(frame):
     if len(proboscis_img.shape)==3:
         proboscis_img = cv2.cvtColor(proboscis_img,cv2.COLOR_BGR2GRAY)
 
-    cimg, proboscis_coords_list, proboscis_orient_list, bb_list = find_proboscis(proboscis_img, cimg, bb_list, head_list, remove_body_thresh)
+    cimg, proboscis_coords_list, proboscis_orient_list, bb_list = find_proboscis_v2(proboscis_img, cimg, bb_list, head_list, remove_body_thresh)
 
 #         disp_img = np.concatenate((img, cimg), axis = 1)
     cimg_s = cv2.resize(cimg,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
@@ -58,18 +58,21 @@ def proboscis_monitor_once(frame):
 
 if __name__ == "__main__":
 
-    #fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    #out = cv2.VideoWriter('output.avi',fourcc, 4.0, (1600,1200))
-    
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter('/home/administer/Desktop/output.mp4',fourcc, 4.0, (1600,1200))
+    cap = cv2.VideoCapture(0)
+    cap.set(3,1600)
+    cap.set(4,1200)
     while(cap.isOpened()):
         t_start = t.time()
         ret, frame = cap.read()
         if ret==True:
             proboscis_coords, proboscis_orients, bb_list, cimg = proboscis_monitor_once(frame)
-            print(proboscis_coords, proboscis_orients)
+            #print(proboscis_coords, proboscis_orients)
             t_end = t.time()
             print(t_end - t_start)
-            #out.write(cimg)
+            #cv2.imshow('frame', frame)
+            out.write(cimg)
             if cv2.waitKey(1) & 0xFF == 27:
                 break
         else:
@@ -77,6 +80,6 @@ if __name__ == "__main__":
 
     # Release everything if job is finished
     cap.release()
-    #out.release()
+    out.release()
     cv2.destroyAllWindows()
     

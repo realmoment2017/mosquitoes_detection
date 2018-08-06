@@ -29,6 +29,27 @@ def remove_body_head(img, remove_body_thresh):
     diff = cv2.dilate(diff,kernel,iterations=1)
     return img, diff, diff_for_dbscan
 
+def remove_body_head_v2(img, remove_body_thresh):
+    #remove_body    
+    body_img = img.copy()
+    ret, body_thresh_img = cv2.threshold(body_img,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
+    body_thresh_copy = body_thresh_img.copy()
+    kernel = np.ones((7,7),np.uint8)
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3, 3))
+    #body_thresh_img = cv2.erode(body_thresh_img,kernel,iterations=15)
+    #body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=13)
+
+    dist_transform = cv2.distanceTransform(body_thresh_img, cv2.DIST_L2, 5)
+    ret, body_thresh_img = cv2.threshold(dist_transform, 0.8*dist_transform.max(), 255,0)
+    body_thresh_img = cv2.dilate(body_thresh_img,kernel,iterations=6)
+
+    diff = abs(body_thresh_copy - body_thresh_img)
+    diff_for_dbscan = diff.copy()
+    kernel = np.ones((7,7),np.uint8)
+    diff = cv2.erode(diff,kernel,iterations=1)
+    diff = cv2.dilate(diff,kernel,iterations=1)
+    return img, diff, diff_for_dbscan
+
 def remove_body_proboscis(img, remove_body_thresh):
     #remove_body    
     body_img = img.copy()
@@ -52,9 +73,8 @@ def get_img_value(img, x, y):
     aver += (img[y,x]*6 + img[y-3,x] + img[y+3,x] + img[y,x-3] + img[y,x+3])/10.0
     aver += (img[y,x]*6 + img[y-4,x+3] + img[y+2,x-3] + img[y-1,x-3] + img[y+4,x+2])/10.0
     return aver
-    
 
-def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
+def find_head_v4(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
     #using hough circle detection
     
     #remove_body    
@@ -106,7 +126,59 @@ def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     
     return head_list
 
-def find_head_v2(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
+def find_head_v3(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
+    #using hough circle detection
+    
+    #remove_body    
+    img, diff, diff_for_dbscan = remove_body_head_v2(img, remove_body_thresh)
+
+    img_s = diff_for_dbscan.copy()
+    img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    cv2.imshow('head_thresh_img', img_s)
+
+    diff = 255-diff
+    img[diff==255] = 255
+
+
+    ret, thresh = cv2.threshold(img,55,255,cv2.THRESH_BINARY)
+    img[thresh>0] = 255
+    img = cv2.medianBlur(img,5)
+    
+    #img_s = img.copy()
+    #img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
+    #cv2.imshow('head_thresh_img', img_s)
+    
+    head_list = list()
+    for (x,y,w,h) in bb_list:
+        roi = img[y:y+h, x:x+w]
+        roi_for_dbscan = diff_for_dbscan[y:y+h, x:x+w]
+        labels, tail_index = find_tail(roi_for_dbscan)
+
+#         cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,0,255),2)
+        circles = cv2.HoughCircles(roi,cv2.HOUGH_GRADIENT,2,minDist = min_dist,
+                                    param1=20,param2=acc_thresh,minRadius=5,maxRadius=13)
+        
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            aver_min = 9999
+            for i in circles[0,:]:
+                # draw the outer circle
+                aver = get_img_value(img, x + i[0], y + i[1])
+                if aver<aver_min:
+                    aver_min = aver
+                    c_x = x + i[0]
+                    c_y = y + i[1]
+            if (c_y-y,c_x-x) in labels.keys():
+                if labels[(c_y-y,c_x-x)]!=tail_index:
+                #if True:
+                    cv2.circle(cimg,(c_x,c_y),10,(0,255,0),2)
+                    head_list.append((c_y, c_x))
+                    # draw the center of the circle
+        #             cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
+    
+    return head_list
+
+def find_head_v1(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
     #using hough circle detection
     
     #remove_body    
@@ -155,7 +227,7 @@ def find_head_v2(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     
     return head_list
 
-def find_head_v3(img, cimg, bb_list, min_dist, acc_thresh, remove_body_thresh=80):
+def find_head_v2(img, cimg, bb_list, min_dist, acc_thresh, remove_body_thresh=80):
     #remove_body    
     img, diff = remove_body(img, remove_body_thresh)
     diff = 255-diff
@@ -187,8 +259,8 @@ def find_head_v3(img, cimg, bb_list, min_dist, acc_thresh, remove_body_thresh=80
     return head_list
 
 
-def find_proboscis(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size=30):
-    
+def find_proboscis_v1(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size=30):
+    # using thresh img for hough line detection
     # remove_body    
     img, diff = remove_body_proboscis(img, remove_body_thresh)
     proboscis_coords_list = []
@@ -249,6 +321,74 @@ def find_proboscis(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size
             proboscis_orient_list.append(theta)
             cv2.circle(cimg,(proboscis_coords[0], proboscis_coords[1]),3,(0,0,255),2)
             bb_list_refine.append([x,y,w,h])
+#             cv2.line(cimg,(head_w,head_h),(end_point[0], end_point[1]),(0,150,255),6)
+    #print(proboscis_coords_list, proboscis_orient_list)
+    return cimg, proboscis_coords_list, proboscis_orient_list, bb_list_refine
+
+def find_proboscis_v2(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size=30):
+    # using canny image for hough line
+    # remove_body    
+    img, diff = remove_body_proboscis(img, remove_body_thresh)
+    proboscis_coords_list = []
+    proboscis_orient_list = []
+    bb_list_refine = []
+    for (x,y,w,h), (head_h,head_w) in zip(bb_list, head_list):
+        if (head_h - bb_size)>0:
+            y = (head_h - bb_size)
+        if (head_w - bb_size)>0:
+            x = (head_w - bb_size)
+        #cv2.rectangle(cimg,(x,y),(x+bb_size*2,y+bb_size*2),(255,0,255),2)
+        
+        roi = diff[y:y+bb_size*2, x:x+bb_size*2]
+        roi = cv2.medianBlur(roi,5)
+        
+        roi = cv2.Canny(roi, 50, 150, apertureSize=3)
+        minLineLength = 0
+        maxLineGap = 0
+        acc_thresh = 5
+        lines = cv2.HoughLinesP(roi,1,np.pi/180,acc_thresh,minLineLength,maxLineGap)
+        cv2.circle(cimg,(head_w, head_h),10,(0,255,0),2)
+        max_dist = 0
+        theta_list = list()
+        degree_list = list()
+
+        if lines is not None:
+            for line in lines:
+                for x1,y1,x2,y2 in line:
+                    if np.linalg.norm([abs(x1-x2), abs(y1-y2)],2)>minLineLength:
+                        p1 = np.array([x1+x,y1+y], dtype=np.float32)
+                        p2 = np.array([x2+x,y2+y], dtype=np.float32)
+                        p3 = np.array([head_w,head_h], dtype=np.float32)
+#                         cv2.line(cimg,(x1+x,y1+y),(x2+x,y2+y),(0,255,255),2)
+                        dist = np.abs(np.cross(p2-p1, p1-p3)) / np.linalg.norm(p2-p1)
+                        if dist<15:
+#                             cv2.line(cimg,(x1+x,y1+y),(x2+x,y2+y),(0,255,0),2)
+                            
+                            dist_p1 = np.linalg.norm(p1-p3)
+                            dist_p2 = np.linalg.norm(p2-p3)
+                            if dist_p1>max_dist:
+                                max_dist = dist_p1
+                                end_point = p1
+                            if dist_p2>max_dist:
+                                max_dist = dist_p2
+                                end_point = p2
+        if max_dist>0:
+            #theta = np.arctan2(end_point[0] - head_w, end_point[1] - head_h)
+            #cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.sin(theta)), int(head_h + 40*np.cos(theta))),(0,255,255),3)
+            #proboscis_coords = (int(head_w + 20*np.sin(theta)), int(head_h + 20*np.cos(theta)))
+            #proboscis_coords_list.append(proboscis_coords)
+            #theta = theta-(np.pi/2)
+
+            theta = np.arctan2(-(end_point[1] - head_h), end_point[0] - head_w)
+
+            cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.cos(theta)), int(head_h - 40*np.sin(theta))),(0,255,255),3)
+            proboscis_coords = (int(head_w + 20*np.cos(theta)), int(head_h - 20*np.sin(theta)))
+            proboscis_coords_list.append(proboscis_coords)
+
+            proboscis_orient_list.append(theta)
+            cv2.circle(cimg,(proboscis_coords[0], proboscis_coords[1]),3,(0,0,255),2)
+            bb_list_refine.append([x,y,w,h])
+            cv2.rectangle(cimg,(x,y),(x+bb_size*2,y+bb_size*2),(255,0,255),2)
 #             cv2.line(cimg,(head_w,head_h),(end_point[0], end_point[1]),(0,150,255),6)
     #print(proboscis_coords_list, proboscis_orient_list)
     return cimg, proboscis_coords_list, proboscis_orient_list, bb_list_refine
@@ -433,8 +573,8 @@ def find_tail(roi):
 #     plt.show()  
     
 
-    print(np.unique(labels))
-    print(count)
+    #print(np.unique(labels))
+    #print(count)
     #print(tail_index)
     
     return label_dict, tail_index
