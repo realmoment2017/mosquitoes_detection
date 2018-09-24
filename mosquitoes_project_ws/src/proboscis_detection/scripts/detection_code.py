@@ -12,7 +12,15 @@ def create_track_bars():
     cv2.setTrackbarPos('remove_body_thresh', 'cimg', 100)
 
 def remove_body_head(img, remove_body_thresh):
-    #remove_body    
+    """remove body  for the head detection.
+	Args:  
+	    img: input gray image
+		remove_body_thresh:  threshold for mosquitoes.
+	Returns:
+	    img: same as the input.
+		diff: difference between the threshold image the distance transform image.
+		diff_for_dbscan: difference between the threshold image the distance transform image without further morphorlogical processing.
+	"""  
     body_img = img.copy()
     ret, body_thresh_img = cv2.threshold(body_img,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
     body_thresh_copy = body_thresh_img.copy()
@@ -30,7 +38,15 @@ def remove_body_head(img, remove_body_thresh):
     return img, diff, diff_for_dbscan
 
 def remove_body_head_v2(img, remove_body_thresh):
-    #remove_body    
+    """remove body  for the head detection.
+	Args:  
+	    img: input gray image
+		remove_body_thresh:  threshold for mosquitoes.
+	Returns:
+	    img: same as the input.
+		diff: difference between the threshold image the distance transform image.
+		diff_for_dbscan: difference between the threshold image the distance transform image without further morphorlogical processing.
+	"""  
     body_img = img.copy()
     ret, body_thresh_img = cv2.threshold(body_img,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
     body_thresh_copy = body_thresh_img.copy()
@@ -51,7 +67,14 @@ def remove_body_head_v2(img, remove_body_thresh):
     return img, diff, diff_for_dbscan
 
 def remove_body_proboscis(img, remove_body_thresh):
-    #remove_body    
+    """remove body  for the proboscis detection.
+	Args:  
+	    img: input gray image
+		remove_body_thresh:  threshold for mosquitoes.
+	Returns:
+	    img: same as the input.
+		diff: difference between the threshold image the distance transform image.
+	"""  
     body_img = img.copy()
     ret, body_thresh_img = cv2.threshold(body_img,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
     body_thresh_copy = body_thresh_img.copy()
@@ -69,6 +92,14 @@ def remove_body_proboscis(img, remove_body_thresh):
     return img, diff
 
 def get_img_value(img, x, y):
+    """remove body  for the proboscis detection.
+	Args:  
+	    img: input gray image.
+		x: head x coordinate.
+		y: head y coordinate.
+	Returns:
+	    aver: the average pixel value.
+	"""  
     aver = 0
     aver += (img[y,x]*6 + img[y-3,x] + img[y+3,x] + img[y,x-3] + img[y,x+3])/10.0
     aver += (img[y,x]*6 + img[y-4,x+3] + img[y+2,x-3] + img[y-1,x-3] + img[y+4,x+2])/10.0
@@ -127,18 +158,28 @@ def find_head_v4(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     return head_list
 
 def find_head_v3(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thresh=80):
-    #using hough circle detection
+    """find head locations. 
+	Args:  
+	    img: input gray image
+		cimg:  three channel RGB image.
+		bb_list: list of bounding boxes.
+		min_dist: a required parameter for Hough Circle Detection.
+		acc_thresh: a required parameter for Hough Circle Detection.
+		remove_body_thresh: threshold for proboscis.
+	Returns:
+	    head_list: a list of head coordinates.
+	"""  
     
-    #remove_body    
+    # remove_body    
     img, diff, diff_for_dbscan = remove_body_head_v2(img, remove_body_thresh)
 
+	# using DBSCAN to cluster regions
     img_s = diff_for_dbscan.copy()
     img_s = cv2.resize(img_s,None,fx=0.5, fy=0.5, interpolation = cv2.INTER_CUBIC)
     cv2.imshow('head_thresh_img', img_s)
 
     diff = 255-diff
     img[diff==255] = 255
-
 
     ret, thresh = cv2.threshold(img,55,255,cv2.THRESH_BINARY)
     img[thresh>0] = 255
@@ -149,11 +190,14 @@ def find_head_v3(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
     #cv2.imshow('head_thresh_img', img_s)
     
     head_list = list()
+	# iterate through all bounding boxes and find head positions using Hough Circle Transform
     for (x,y,w,h) in bb_list:
         roi = img[y:y+h, x:x+w]
         roi_for_dbscan = diff_for_dbscan[y:y+h, x:x+w]
+		# find the tail cluster and record the label
         labels, tail_index = find_tail(roi_for_dbscan)
 
+		# Hough Circle Transform
 #         cv2.rectangle(cimg,(x,y),(x+w,y+h),(255,0,255),2)
         circles = cv2.HoughCircles(roi,cv2.HOUGH_GRADIENT,2,minDist = min_dist,
                                     param1=20,param2=acc_thresh,minRadius=5,maxRadius=13)
@@ -168,6 +212,7 @@ def find_head_v3(img, cimg, bb_list, min_dist=35, acc_thresh=8, remove_body_thre
                     aver_min = aver
                     c_x = x + i[0]
                     c_y = y + i[1]
+		    # identify as a false detection if the head position doesn't belong to the tail cluster
             if (c_y-y,c_x-x) in labels.keys():
                 if labels[(c_y-y,c_x-x)]!=tail_index:
                 #if True:
@@ -326,12 +371,28 @@ def find_proboscis_v1(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_s
     return cimg, proboscis_coords_list, proboscis_orient_list, bb_list_refine
 
 def find_proboscis_v2(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_size=30):
+    """find proboscis locations. 
+	Args:  
+	    img: input gray image
+		cimg: three channel RGB image
+		bb_list: list of bounding boxes.
+		head_list: a list of head coordinates.
+		remove_body_thresh: threshold for mosquitoes.
+		bb_size:bounding box size for proboscis detection.
+	Returns:
+	    cimg: three channel RGB image.
+		proboscis_coords_list: a list of proboscis coordinates.
+		proboscis_orient_list: a list of proboscis orientations.
+		bb_list_refine: a list of refined bounding boxes. The difference between bb_list and bb_list _refine is that 
+		                          bb_list_refine has deleted bounding boxes without heads detected.
+	"""  
     # using canny image for hough line
     # remove_body    
     img, diff = remove_body_proboscis(img, remove_body_thresh)
     proboscis_coords_list = []
     proboscis_orient_list = []
     bb_list_refine = []
+	# iterate through bounding boxes according to heads positions to find proboscis in each of them
     for (x,y,w,h), (head_h,head_w) in zip(bb_list, head_list):
         if (head_h - bb_size)>0:
             y = (head_h - bb_size)
@@ -341,17 +402,19 @@ def find_proboscis_v2(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_s
         
         roi = diff[y:y+bb_size*2, x:x+bb_size*2]
         roi = cv2.medianBlur(roi,5)
-        
+        # using canny edge detection to find edges
         roi = cv2.Canny(roi, 50, 150, apertureSize=3)
         minLineLength = 0
         maxLineGap = 0
         acc_thresh = 5
+		# applying Hough Circle Transform to find lines
         lines = cv2.HoughLinesP(roi,1,np.pi/180,acc_thresh,minLineLength,maxLineGap)
         cv2.circle(cimg,(head_w, head_h),10,(0,255,0),2)
         max_dist = 0
         theta_list = list()
         degree_list = list()
 
+		# iterate through all line candidates to remove false positives.
         if lines is not None:
             for line in lines:
                 for x1,y1,x2,y2 in line:
@@ -372,6 +435,7 @@ def find_proboscis_v2(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_s
                             if dist_p2>max_dist:
                                 max_dist = dist_p2
                                 end_point = p2
+		# max_dist>0 means there is at least one line being proposed						
         if max_dist>0:
             #theta = np.arctan2(end_point[0] - head_w, end_point[1] - head_h)
             #cv2.line(cimg,(head_w,head_h),(int(head_w + 40*np.sin(theta)), int(head_h + 40*np.cos(theta))),(0,255,255),3)
@@ -394,7 +458,7 @@ def find_proboscis_v2(img, cimg, bb_list, head_list, remove_body_thresh=80, bb_s
     return cimg, proboscis_coords_list, proboscis_orient_list, bb_list_refine
 
 def bbox_detection(src_img_copy, cimg, remove_body_thresh=100):
-
+    # bounding box detection mainly refers to the python watershed algorithm
     gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(gray,remove_body_thresh,255,cv2.THRESH_BINARY_INV)
 
@@ -443,6 +507,7 @@ def bbox_detection(src_img_copy, cimg, remove_body_thresh=100):
     num_iters = markers_copy.max() + 1
 
     bb_list = []
+	# using area and aspect ratio to remove false positives
     for index in range(2, num_iters):
         thresh_img = np.zeros((HEIGHT, WIDTH), dtype = np.uint8)
         thresh_img[markers_copy==index] = 255
@@ -463,6 +528,9 @@ def bbox_detection(src_img_copy, cimg, remove_body_thresh=100):
 
 
 def fit_lines(src_img_copy, cimg, bb_list, thresh=80):
+    """
+    # calculate body orientations using second moments of bounding box regions
+    """
     gray = cv2.cvtColor(src_img_copy,cv2.COLOR_BGR2GRAY)
     _, line_img = cv2.threshold(gray,thresh,255,cv2.THRESH_BINARY_INV)
     kernel = np.ones((3,3),np.uint8)    
@@ -512,6 +580,9 @@ def fit_lines(src_img_copy, cimg, bb_list, thresh=80):
 
 
 def remove_tool(img, binary):
+    """ 
+	using color information to remove the tool/gripper.
+	""" 
     # Convert BGR to HSV
     hsv_img = img.copy()
     hsv = cv2.cvtColor(hsv_img, cv2.COLOR_BGR2HSV)
@@ -532,7 +603,6 @@ def remove_tool(img, binary):
 #         cv2.circle(frame, (100,200),5,(130,50,50), 3)
 #         print(hsv[200,100])
 
-
     kernel = np.ones((35,35),np.uint8)
     tool_area = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
@@ -541,7 +611,9 @@ def remove_tool(img, binary):
 
 
 def find_tail(roi):
-    
+     """ 
+	using DBSCAN to find the tail cluster.
+	"""    
 #     t_start = t.time()
     image_diff = roi.copy()
     init_shape = image_diff.shape
